@@ -1,0 +1,106 @@
+#! /usr/bin/env polyperl -s
+use 5.014;
+use warnings;
+use experimentals;
+
+use PPR;
+use List::Util 'uniq';
+
+our $n;     # -n flag means 'name of new sub'
+
+# Default name is terrible, but better than no name at all...
+my $SUBNAME = $n // '___SUBNAME___';
+
+# These variables don't need to be passed in,
+# even though they're not locally declared...
+my $PERL_SPECIAL_VAR = qr{
+    \A
+    [\$\@%]
+    (?:
+        [][\d\{!"#\$%&'()*+,./:;<=>?\@\^`|~_-]
+    |
+        [\{^] .*
+    |
+        ACCUMULATOR | ARG | ARGV | ARRAY_BASE | AUTOLOAD | BASETIME | CHILD_ERROR |
+        COMPILING | DEBUGGING | EFFECTIVE_GROUP_ID | EFFECTIVE_USER_ID | EGID | ENV |
+        ERRNO | EUID | EVAL_ERROR | EXCEPTIONS_BEING_CAUGHT | EXECUTABLE_NAME |
+        EXTENDED_OS_ERROR | F | FORMAT_FORMFEED | FORMAT_LINES_LEFT | FORMAT_LINES_PER_PAGE |
+        FORMAT_LINE_BREAK_CHARACTERS | FORMAT_NAME | FORMAT_PAGE_NUMBER | FORMAT_TOP_NAME |
+        GID | INC | INPLACE_EDIT | INPUT_LINE_NUMBER | INPUT_RECORD_SEPARATOR |
+        LAST_MATCH_END | LAST_MATCH_START | LAST_PAREN_MATCH | LAST_REGEXP_CODE_RESULT |
+        LAST_SUBMATCH_RESULT | LIST_SEPARATOR | MATCH | NR | OFMT | OFS | OLD_PERL_VERSION |
+        ORS | OSNAME | OS_ERROR | OUTPUT_AUTOFLUSH | OUTPUT_FIELD_SEPARATOR |
+        OUTPUT_RECORD_SEPARATOR | PERLDB | PERL_VERSION | PID | POSTMATCH | PREMATCH |
+        PROCESS_ID | PROGRAM_NAME | REAL_GROUP_ID | REAL_USER_ID | RS | SIG | SUBSCRIPT_SEPARATOR |
+        SUBSEP | SYSTEM_FD_MAX | UID | WARNING | a | b
+    )
+    \Z
+}x;
+
+# Acquire the code to be refactors...
+my $target_code = do { local $/; readline };
+
+# Extract just the variables from any local 'my', 'our', or 'state'...
+my %local_vars = map  { trim($_) => 1 }
+                 grep {defined}
+                 map  { m{ ((?&PerlVariable)) $PPR::GRAMMAR }xg }
+                 grep {defined}
+                 $target_code =~ m{ ((?&PerlVariableDeclaration)) $PPR::GRAMMAR }xg;
+
+# Locate any other (undeclared) variables that were used in the code...
+my @nonlocal_vars = grep { !exists $local_vars{$_} && ! m{$PERL_SPECIAL_VAR} }
+                    uniq
+                    map  { m{ \$\# ([\w:']++)    }x ? '@'.$1      # Convert array maxindex to array name
+                         : m{ \$   ([\w:']++) \[ }x ? '@'.$1      # Convert array lookups to array names
+                         : m{ \$   ([\w:']++) \{ }x ? '%'.$1      # Convert hash lookups to hash names
+                         :                                $_
+                         }
+                    map  { trim($_) }
+                    grep {defined}
+                    $target_code =~ m{ ((?&PerlVariable)) $PPR::GRAMMAR }xg;
+
+# Create the argument list for the call,
+# enreferencing container vars...
+my $arglist   = join( ', ', map { m{\A[\@%]} ? '\\'.$_ : $_ } @nonlocal_vars);
+
+# Look for a leading assignment to be preserved...
+my $leader    = $target_code =~ s{ \A (\s* (?: [^\w\s]*= )? \s*) }{ ' ' x length($1) }exms ? $1 : q{};
+
+# Look for a trailing semicolon to be preserved...
+my $semicolon = $target_code =~ s{ ; \s* \Z }{}xms ? q{;} : q{};
+
+# Functional-style code doesn't end in a semi-colon or a control block...
+my $is_functional = $target_code !~ m{ (?: (?<! \$ ) ; | (?&PerlControlBlock)) \s* \Z  $PPR::GRAMMAR }xg;
+
+# Functional-style code may need to append @_
+# and to be invoked with a trailing comma and no parens...
+if ($is_functional) {
+    $target_code .= ' @_ ' if !$semicolon;
+    $arglist = @nonlocal_vars ? " $arglist" . ($semicolon ? q{} : ',') : q{};
+}
+
+# Non-functional-style code may need a return statement,
+# and is more safely called with parens...
+else { # Non-functional...
+    $target_code .= "\n    # RETURN VALUE? MAYBE: ". join(', ', keys(%local_vars), @nonlocal_vars) ."\n";
+    $arglist = "( $arglist )";
+}
+
+# Make the invocation a single line...
+say "$leader$SUBNAME$arglist$semicolon" =~ s{\n}{ }gr;
+
+# Build the subroutine definition...
+my $refactored_code = "sub $SUBNAME {\n"
+  . join( q{}, map { m{\A([\@%])} ? "    my $_ = $1\{shift()};\n" : "    my $_ = shift();\n" } @nonlocal_vars)
+  . $target_code
+  . '}';
+
+# Reformat the subroutine definition...
+use Perl::Tidy;
+Perl::Tidy::perltidy( source => \$refactored_code );
+
+
+# This just trims whitespace fore and aft of a string...
+sub trim {
+    shift =~ s{^\s*}{}r =~ s{\s*$}{}r;
+}

@@ -1,0 +1,11 @@
+#! /usr/bin/env perl -w
+
+my ($which, $report) = @ARGV;
+
+if ($report) {
+    print qx{osascript -e 'tell app "Terminal" to get name of current settings of front window'};
+}
+
+system qq{osascript -e 'tell app "Terminal" to set current settings of front window to settings set "$which"'};
+system qq{osascript -e 'tell app "Terminal" to set zoomed of front window to true'};
+
