@@ -7,3 +7,4 @@ I am using it for Perl IDE.
 1. vimfiler
 2. easy motion
 3. fugitive
+4. unite
