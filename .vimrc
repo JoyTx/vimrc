@@ -4,25 +4,34 @@
 "  \ V /| | | | | | | | | (__
 "   \_/ |_|_| |_| |_|_|  \___|
 
-let mapleader =" "
+let mapleader =","
 " Source Vim config file.
-map <Leader>sv :source $MYVIMRC<CR>
+map <leader>sv :source $MYVIMRC<CR>
 
 call plug#begin('~/.vim/plugged')
 Plug 'junegunn/goyo.vim'
 Plug 'PotatoesMaster/i3-vim-syntax'
-Plug 'jreybert/vimagit'
-Plug 'LukeSmithxyz/vimling'
+" Plug 'jreybert/vimagit'
+Plug 'tpope/vim-fugitive'
+" Plug 'LukeSmithxyz/vimling'
 Plug 'vimwiki/vimwiki'
 Plug 'vim-scripts/AutoComplPop'
 Plug 'dense-analysis/ale'
 Plug 'jceb/vim-hier'
-Plug 'mg979/vim-visual-multi'
+Plug 'jiangmiao/auto-pairs'
+Plug 'easymotion/vim-easymotion'
+Plug 'vim-airline/vim-airline'
+Plug 'vim-airline/vim-airline-themes'
+Plug 'Shougo/vimfiler.vim'
+Plug 'Shougo/unite.vim'
+Plug 'Shougo/vimproc.vim'
+" Plug 'mg979/vim-visual-multi'
 call plug#end()
 
 " Some basics:
 	set nocompatible
 	set autoindent
+	set autochdir
 	set hlsearch
 	set incsearch
 	set showmatch
@@ -33,6 +42,8 @@ call plug#end()
 " Enable autocompletion:
 	set wildmode=longest,list,full
 	let g:acp_behaviorPerlOmniLength = 10
+	inoremap jk <ESC>
+	nnoremap <SPACE> /
 " Disables automatic commenting on newline:
 	autocmd FileType * setlocal formatoptions-=c formatoptions-=r formatoptions-=o
 
@@ -54,12 +65,8 @@ call plug#end()
 " Check file in shellcheck:
 	map <leader>s :!clear && shellcheck %<CR>
 
-" Open my bibliography file in split
-	map <leader>b :vsp<space>$BIB<CR>
-	map <leader>r :vsp<space>$REFER<CR>
-
 " Replace all is aliased to S.
-	nnoremap S :%s//g<Left><Left>
+"	nnoremap S :%s//g<Left><Left>
 
 " Compile document, be it groff/LaTeX/markdown/etc.
 	map <leader>c :w! \| !compiler <c-r>%<CR><CR>
@@ -105,7 +112,7 @@ call plug#end()
 	inoremap <Space><Tab> <Esc>/<++><Enter>"_c4l
 	vnoremap <Space><Tab> <Esc>/<++><Enter>"_c4l
 	map <Space><Tab> <Esc>/<++><Enter>"_c4l
-"highlight while searching only
+" Highlight while searching only
 	augroup vimrc-incsearch-highlight
 	  autocmd!
 	  autocmd CmdlineEnter /,\? :set hlsearch
@@ -203,12 +210,6 @@ call plug#end()
 	autocmd FileType html inoremap ì &igrave;
 	autocmd FileType html inoremap ò &ograve;
 	autocmd FileType html inoremap ù &ugrave;
-
-
-""".bib
-	autocmd FileType bib inoremap ,a @article{<Enter>author<Space>=<Space>{<++>},<Enter>year<Space>=<Space>{<++>},<Enter>title<Space>=<Space>{<++>},<Enter>journal<Space>=<Space>{<++>},<Enter>volume<Space>=<Space>{<++>},<Enter>pages<Space>=<Space>{<++>},<Enter>}<Enter><++><Esc>8kA,<Esc>i
-	autocmd FileType bib inoremap ,b @book{<Enter>author<Space>=<Space>{<++>},<Enter>year<Space>=<Space>{<++>},<Enter>title<Space>=<Space>{<++>},<Enter>publisher<Space>=<Space>{<++>},<Enter>}<Enter><++><Esc>6kA,<Esc>i
-	autocmd FileType bib inoremap ,c @incollection{<Enter>author<Space>=<Space>{<++>},<Enter>title<Space>=<Space>{<++>},<Enter>booktitle<Space>=<Space>{<++>},<Enter>editor<Space>=<Space>{<++>},<Enter>year<Space>=<Space>{<++>},<Enter>publisher<Space>=<Space>{<++>},<Enter>}<Enter><++><Esc>8kA,<Esc>i
 
 "MARKDOWN
 	autocmd Filetype markdown,rmd map <leader>w yiWi[<esc>Ea](<esc>pa)
@@ -512,3 +513,44 @@ set breakindent
  "let g:VM_maps = {}
  "let g:VM_maps["Select Cursor Down"] = '<S-Down>'
  "let g:VM_maps["Select Cursor Up"]   = '<A-Up>'
+
+"======[ vimfiler plugin settings]========
+let g:vimfiler_as_default_explorer = 1
+
+"	tabopen		Open the file in a new tab.
+"	choose		Open the file in a selected window.
+"	split		Open the file, splitting horizontally.
+"	vsplit		Open the file, splitting vertically.
+"	left		Open the file in the left, splitting vertically.
+"	right		Open the file in the right, splitting vertically.
+"	above		Open the file in the top, splitting horizontally.
+"	below		Open the file in the bottom, splitting horizontally.
+"	persist_open	Open the file in alternate window.  unite window
+"			isn't closed.
+"	tabsplit	Open the files and vsplit in a new tab.
+"	switch		Open the file in current window or jump to existing
+"			window/tabpage.
+"	tabswitch	Open the file in new tab or jump to existing
+"			window/tabpage.
+"	splitswitch	Open the file in split window or jump to existing
+"			window/tabpage.
+"	vsplitswitch	Open the file in vertical split window or jump to
+"			existing window/tabpage.
+call vimfiler#custom#profile('default', 'context', {
+      \ 'winwidth' : 50,
+      \ 'columns' : 'size:time',
+      \ 'safe' : 1,
+      \ 'edit_action' : 'left',
+      \ 'quit' : 0
+      \ })
+map <F8> :VimFilerSplit -toggle <CR>
+" Like Textmate icons.
+let g:vimfiler_tree_leaf_icon = ' '
+let g:vimfiler_tree_opened_icon = '▾'
+let g:vimfiler_tree_closed_icon = '▸'
+let g:vimfiler_file_icon = '-'
+let g:vimfiler_marked_file_icon = '✩'
+autocmd VimEnter * if !argc() | VimFiler | endif
+
+"======[ unit.vim plugin settings]========
+let g:unite_prompt = "➤ "
