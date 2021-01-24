@@ -1,1 +1,1 @@
-# personal vimrc
+# personal vimrc,I am a rookie Vimer.
